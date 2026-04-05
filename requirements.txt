@@ -1,0 +1,4 @@
+pandas
+numpy
+scikit-learn
+# can add more later as needed
