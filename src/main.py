@@ -22,19 +22,25 @@ def main():
             return 'D'
         else:
             return 'F'
+        
+    def convert_to_binary(value):
+        if value == 'Yes':
+            return 1
+        else:
+            return 0
     
     data['grade'] = data['exam_score'].apply(convert_to_grade)
+    data['part_time_job'] = data['part_time_job'].apply(convert_to_binary)
+    data['extracurricular_participation'] = data['extracurricular_participation'].apply(convert_to_binary)
     
     # preprocess data 
     columns = ['study_hours_per_day', 'social_media_hours', 'part_time_job', 'attendance_percentage',
-               'sleep_hours', 'exercise_frequency', 'mental_health_rating', 'extracurricular_participation']
+                'sleep_hours', 'exercise_frequency', 'mental_health_rating', 'extracurricular_participation']
 
     data = data.dropna(subset=columns + ['grade'])
 
-    # TODO: turn the part_time_job and extracurricular_participation into binary, for now just
-    # use the columns that are numbers already
-    numeric_data = ['study_hours_per_day', 'social_media_hours', 'attendance_percentage',
-                    'sleep_hours', 'exercise_frequency', 'mental_health_rating']
+    numeric_data = ['study_hours_per_day', 'social_media_hours', 'part_time_job', 'attendance_percentage',
+                    'sleep_hours', 'exercise_frequency', 'mental_health_rating', 'extracurricular_participation']
     x = data[numeric_data]
     y = data['grade']
 
