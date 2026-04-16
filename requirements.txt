@@ -1,4 +1,5 @@
 pandas
 numpy
+torch
 scikit-learn
 # can add more later as needed
