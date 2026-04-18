@@ -1,7 +1,10 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import ConfusionMatrixDisplay
 
 def main():
     # load dataset
@@ -39,22 +42,35 @@ def main():
 
     data = data.dropna(subset=columns + ['grade'])
 
-    numeric_data = ['study_hours_per_day', 'social_media_hours', 'part_time_job', 'attendance_percentage',
-                    'sleep_hours', 'exercise_frequency', 'mental_health_rating', 'extracurricular_participation']
-    x = data[numeric_data]
+    x = data[columns]
     y = data['grade']
 
+    # standardize features 
+    scaler = StandardScaler()
+    x_scaled = scaler.fit_transform(x)
+
     # split data into training/testing sets
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+    x_train, x_test, y_train, y_test = train_test_split(x_scaled, y, test_size=0.2, random_state=1)
 
     # train a baseline model (can train more complex models later, starting with simple logistic regression)
     # XGBoost, Random Forest, etc
-    model = LogisticRegression(max_iter=1000)
+    model = LogisticRegression(max_iter=5000)
     model.fit(x_train, y_train)
 
     # results
-    acc = accuracy_score(y_test, model.predict(x_test))
+    predictions = model.predict(x_test)
+    acc = accuracy_score(y_test, predictions)
+
     print(f"baseline accuracy: {acc:.2%}")
+
+    print("confusion matrix:")
+    ConfusionMatrixDisplay.from_predictions (
+        y_test,
+        predictions, 
+        labels = ['A', 'B', 'C', 'D', 'F'],
+        cmap = 'Blues'
+    )
+    plt.show()
 
 if __name__ == "__main__":
     main()
