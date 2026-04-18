@@ -49,9 +49,12 @@ def main():
     scaler = StandardScaler()
     x_scaled = scaler.fit_transform(x)
 
-    # split data into training/testing sets
-    x_train, x_test, y_train, y_test = train_test_split(x_scaled, y, test_size=0.2, random_state=1)
+    # split data into training and temporary sets (70% train, 30% temp)
+    x_train, x_temp, y_train, y_temp = train_test_split(x_scaled, y, test_size=0.3, random_state=1)
 
+    # split remainder in half into validation and test sets
+    x_val, x_test, y_val, y_test = train_test_split(x_temp, y_temp, test_size=0.5, random_state=1)
+    
     # train a baseline model (can train more complex models later, starting with simple logistic regression)
     # XGBoost, Random Forest, etc
     model = LogisticRegression(max_iter=5000)

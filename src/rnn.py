@@ -1,8 +1,13 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import ConfusionMatrixDisplay
+
+# set the random seed so its the same for ffnn and rnn,  betetr comparison
+torch.manual_seed(1)
 
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_layer):
@@ -12,8 +17,8 @@ class RNN(nn.Module):
         self.numOfLayer = 2
         
         self.rnn = nn.RNN(input_size, self.hidden_layer, self.numOfLayer, nonlinearity='tanh', batch_first=True)
-        
-        self.W = nn.Linear(self.hidden_layer, 2)
+        # change output layer to 5 for 5 classes (A, B, C, D, F)
+        self.W = nn.Linear(self.hidden_layer, 5)
         self.softmax = nn.LogSoftmax(dim=1)
         
         self.loss = nn.NLLLoss()
@@ -37,12 +42,18 @@ class RNN(nn.Module):
 def data_processing(file_path):
     student_data = pd.read_csv(file_path)
     
-    def convert_to_pass_fail(score):
-        if score >= 70:
-            return 1
-        else:
+    def convert_to_class(score):
+        if score >= 90: # A
             return 0
-        
+        elif score >= 80: # B
+            return 1
+        elif score >= 70: # C
+            return 2
+        elif score >= 60: # D
+            return 3
+        else: # F
+            return 4
+    
     def convert_to_binary(value):
         if value == 'Yes':
             return 1
@@ -54,7 +65,7 @@ def data_processing(file_path):
     
     student_data = student_data.dropna(subset=features + ['exam_score'])
     
-    student_data['target'] = student_data['exam_score'].apply(convert_to_pass_fail)
+    student_data['target'] = student_data['exam_score'].apply(convert_to_class)
     student_data['part_time_job'] = student_data['part_time_job'].apply(convert_to_binary)
     student_data['extracurricular_participation'] = student_data['extracurricular_participation'].apply(convert_to_binary)
     
@@ -152,3 +163,17 @@ with torch.no_grad():
     test_accuracy = calculate_accuracy(test_predictions, y_test_tensor)
     
     print(f'Real World Accuracy: {test_accuracy*100:.2f}%')
+
+# confusion matrix 
+print("generating rnn confusion matrix...")
+predicted_classes = torch.argmax(test_predictions, dim=1).numpy()
+true_classes = y_test_tensor.numpy()
+
+ConfusionMatrixDisplay.from_predictions (
+    true_classes,
+    predicted_classes,
+    labels = [0, 1, 2, 3, 4],
+    display_labels = ['A', 'B', 'C', 'D', 'F'],
+    cmap = 'Oranges'
+)
+plt.show()
