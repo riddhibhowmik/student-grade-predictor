@@ -45,7 +45,7 @@ def data_processing(file_path):
     return student_data
 
 # load data
-student_data = data_processing('data/student_habits_performance.csv')
+student_data = data_processing('../data/student_habits_performance.csv')
 X = student_data.drop(columns=['target'])
 y = student_data['target']
 

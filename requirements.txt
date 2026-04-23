@@ -2,4 +2,6 @@ pandas
 numpy
 torch
 scikit-learn
+matplotlib
+xgboost
 # can add more later as needed
