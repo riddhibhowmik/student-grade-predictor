@@ -1,13 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import copy
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import ConfusionMatrixDisplay
+from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score
 
 # set the random seed so its the same for ffnn and rnn,  betetr comparison
 torch.manual_seed(1)
+np.random.seed(1)
 
 class FFNN(nn.Module):
     def __init__(self, input_size):
@@ -81,6 +83,7 @@ student_data = data_processing('data/student_habits_performance.csv')
 
 features_df = student_data.drop(columns=['target'])
 target_df = student_data['target']
+feature_names = list(features_df.columns)
 
 # split data into training and temporary sets (70% train, 30% temp)
 features_train, features_temp, target_train, target_temp = train_test_split(features_df, target_df, test_size=0.3, random_state=1)
@@ -120,6 +123,13 @@ def calculate_accuracy(predictions, targets):
 print("Starting training...")
 num_epochs = 100
 
+# early stopping - same setup as rnn.py. also stash the best weights so we can
+# evaluate the model from the best epoch, not whatever epoch we happen to stop on.
+best_val_loss = float('inf')
+best_weights = None
+patience = 10
+counter = 0
+
 for epoch in range(num_epochs):
     model.train()
     
@@ -140,6 +150,21 @@ for epoch in range(num_epochs):
     
     if (epoch+1) % 10 == 0:
         print(f'Epoch [{epoch+1}/{num_epochs}], Training Loss: {loss.item():.1f}, Validation Loss: {val_loss.item():.4f}, Validation Accuracy: {val_accuracy*100:.2f}%')
+    
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        best_weights = copy.deepcopy(model.state_dict())
+        counter = 0
+    else:
+        counter += 1
+    
+    if counter >= patience:
+        print("Early stopping triggered at epoch {}".format(epoch + 1))
+        break
+
+# restore the best weights so test evaluation uses the model from the best epoch
+if best_weights is not None:
+    model.load_state_dict(best_weights)
 
 print("Training complete.")
 
@@ -153,12 +178,60 @@ with torch.no_grad():
     
     print(f'Real World Accuracy: {test_accuracy*100:.2f}%')
 
+# permutation importance - scramble one column at a time and see how much accuracy drops.
+# this is how we answer "how much does each column matter" for a neural net (the tree-style
+# "how often is this column used" doesnt apply since NNs use every input in every prediction)
+print("\ncomputing permutation importance...")
+baseline_preds = torch.argmax(test_predictions, dim=1).numpy()
+true_classes = y_test_tensor.numpy()
+baseline_acc = accuracy_score(true_classes, baseline_preds)
+
+n_repeats = 30
+rng = np.random.default_rng(1)
+X_test_np = X_test_tensor.numpy()
+
+perm_means = []
+perm_stds = []
+for j, feat in enumerate(feature_names):
+    drops = []
+    for _ in range(n_repeats):
+        X_shuffled = X_test_np.copy()
+        rng.shuffle(X_shuffled[:, j])  # scramble just this column
+        with torch.no_grad():
+            shuffled_preds = torch.argmax(model(torch.tensor(X_shuffled, dtype=torch.float32)), dim=1).numpy()
+        drops.append(baseline_acc - accuracy_score(true_classes, shuffled_preds))
+    perm_means.append(np.mean(drops))
+    perm_stds.append(np.std(drops))
+
+perm_means = np.array(perm_means)
+perm_stds = np.array(perm_stds)
+
+# sort so the most important features end up on top of the chart
+sort_idx = np.argsort(perm_means)
+sorted_names = [feature_names[i] for i in sort_idx]
+
+fig, ax = plt.subplots(figsize=(11, 6))
+y_pos = np.arange(len(sorted_names))
+ax.barh(y_pos, perm_means[sort_idx], xerr=perm_stds[sort_idx],
+        color='#6A4C93', alpha=0.88,
+        error_kw={'ecolor': '#3D405B', 'capsize': 4, 'alpha': 0.6})
+ax.set_yticks(y_pos)
+ax.set_yticklabels(sorted_names)
+ax.set_xlabel('Accuracy drop when this column is scrambled')
+ax.set_title('FFNN — How Much Accuracy DEPENDS on Each Column')
+
+for i, v in enumerate(perm_means[sort_idx]):
+    ax.text(v + 0.002, i, f'{v:.3f}', va='center', fontsize=9, color='#3D405B')
+
+plt.tight_layout()
+plt.savefig('ffnn_feature_importance.png', dpi=150, bbox_inches='tight')
+plt.show()
+
 # confusion matrix for visualization
 print("generating ffnn confusion matrix...")
 
 # turn the pytorch tensors back into numpy arrays so it works w/ confusion matrix
 predicted_classes = torch.argmax(test_predictions, dim=1).numpy()
-true_classes = y_test_tensor.numpy()
 
 ConfusionMatrixDisplay.from_predictions (
     true_classes,
