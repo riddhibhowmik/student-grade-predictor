@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
 from sklearn.metrics import (accuracy_score, classification_report, confusion_matrix,
                              precision_recall_fscore_support, ConfusionMatrixDisplay)
 
@@ -180,7 +181,54 @@ print(classification_report(y_test, predictions, target_names=CLASS_LABELS, zero
 
 # ===== visualizations =====
 
-# FIGURE 1: confusion matrix (raw + row-normalized)
+# FIGURE 1: feature importance - two views of how much each column matters
+# left panel = how often the model uses each column when building its trees
+# right panel = how much test accuracy drops when each column's values are randomly scrambled
+print("\ncomputing permutation importance...")
+perm_result = permutation_importance(
+    best_rf, X_test, y_test, n_repeats=30, random_state=RANDOM_STATE, n_jobs=-1
+)
+
+gini_importances = best_rf.feature_importances_
+gini_std = np.std([tree.feature_importances_ for tree in best_rf.estimators_], axis=0)
+
+# sort both panels by permutation importance (the accuracy-based metric)
+sort_idx = np.argsort(perm_result.importances_mean)
+sorted_features = X.columns[sort_idx]
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+y_pos = np.arange(len(sorted_features))
+
+ax = axes[0]
+ax.barh(y_pos, gini_importances[sort_idx], xerr=gini_std[sort_idx],
+        color=PALETTE['primary'], alpha=0.85,
+        error_kw={'ecolor': PALETTE['dark'], 'capsize': 4, 'alpha': 0.6})
+ax.set_yticks(y_pos)
+ax.set_yticklabels(sorted_features)
+ax.set_xlabel('Share of tree splits that use this column')
+ax.set_title('How Much the Model USES Each Column')
+for i, v in enumerate(gini_importances[sort_idx]):
+    ax.text(v + 0.005, i, f'{v:.3f}', va='center', fontsize=9, color=PALETTE['dark'])
+
+ax = axes[1]
+ax.barh(y_pos, perm_result.importances_mean[sort_idx],
+        xerr=perm_result.importances_std[sort_idx],
+        color=PALETTE['accent'], alpha=0.85,
+        error_kw={'ecolor': PALETTE['dark'], 'capsize': 4, 'alpha': 0.6})
+ax.set_yticks(y_pos)
+ax.set_yticklabels(sorted_features)
+ax.set_xlabel('Accuracy drop when this column is scrambled')
+ax.set_title('How Much Accuracy DEPENDS on Each Column')
+for i, v in enumerate(perm_result.importances_mean[sort_idx]):
+    ax.text(v + 0.002, i, f'{v:.3f}', va='center', fontsize=9, color=PALETTE['dark'])
+
+fig.suptitle('Random Forest — Feature Importance (two ways to measure it)',
+             fontsize=15, fontweight='bold')
+fig.tight_layout(rect=[0, 0, 1, 0.95])
+plt.savefig('rf_feature_importance.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+# FIGURE 2: confusion matrix (raw + row-normalized)
 cm = confusion_matrix(y_test, predictions, labels=[0, 1, 2, 3, 4])
 cm_normalized = cm.astype('float') / np.maximum(cm.sum(axis=1, keepdims=True), 1)
 
@@ -201,7 +249,7 @@ fig.tight_layout(rect=[0, 0, 1, 0.95])
 plt.savefig('rf_confusion_matrix.png', dpi=150, bbox_inches='tight')
 plt.show()
 
-# FIGURE 2: per-class precision / recall / F1
+# FIGURE 3: per-class precision / recall / F1
 precision, recall, f1, support = precision_recall_fscore_support(
     y_test, predictions, labels=[0, 1, 2, 3, 4], zero_division=0
 )
@@ -237,7 +285,7 @@ plt.tight_layout()
 plt.savefig('rf_per_class_performance.png', dpi=150, bbox_inches='tight')
 plt.show()
 
-# FIGURE 3: OOB trajectory with early-stopping point marked
+# FIGURE 4: OOB trajectory with early-stopping point marked
 oob_n = [n for n, _ in oob_history]
 oob_vals = [s for _, s in oob_history]
 
