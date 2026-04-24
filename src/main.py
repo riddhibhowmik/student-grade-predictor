@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -74,6 +75,40 @@ def main():
         cmap = 'Blues'
     )
     plt.show()
+
+    # visualize feature importance (for logistic reg, itll be the coefficients)
+    print("visualizing feature importance...")
+
+    # average the absolite value of coefficients across all 5 classes to get overall score
+    importance = np.mean(np.abs(model.coef_), axis=0)
+    sort_indices = np.argsort(importance)
+    sort_names = [columns[i] for i in sort_indices]
+
+    # plot bar chart
+    fig, ax = plt.subplots(figsize=(11, 6))
+    y_pos = np.arange(len(sort_names))
+
+    # add the bars and labels to plot
+    ax.barh(y_pos, importance[sort_indices], color='#2D5F8B', alpha=0.88)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(sort_names)
+    ax.set_xlabel('feature importance score')
+    ax.set_title('Logistic Regression Baseline: How much does each feature contribute to the prediction?')
+
+    # add importance values next to the bars
+    for i, v in enumerate(importance[sort_indices]):
+        ax.text(v + 0.005, i, f'{v:.3f}', va='center', fontsize=9, color='#3D405B')
+
+    # make it look borderless like on other models
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(axis='x', alpha=0.25, linestyle='--')
+
+    # compress if needed so it fits and show it
+    plt.tight_layout()
+    plt.savefig('lr_feature_importance.png', dpi=150, bbox_inches='tight')
+    plt.show()
+
 
 if __name__ == "__main__":
     main()

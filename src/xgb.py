@@ -1,5 +1,6 @@
 import pandas as pd
 import xgboost as xgb
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, ConfusionMatrixDisplay
@@ -45,7 +46,7 @@ def data_processing(file_path):
     return student_data
 
 # load data
-student_data = data_processing('../data/student_habits_performance.csv')
+student_data = data_processing('data/student_habits_performance.csv')
 X = student_data.drop(columns=['target'])
 y = student_data['target']
 
@@ -94,4 +95,38 @@ ConfusionMatrixDisplay.from_predictions(
     display_labels=['A', 'B', 'C', 'D', 'F'],
     cmap='Greens'
 )
+plt.show()
+
+# visualize feature importance
+print ("visualizing xgboost feature importance...")
+importances = xgb_model.feature_importances_
+feature_names = X.columns
+# sort indices by importance
+indices = np.argsort(importances)
+# sort the names according to importance, most important at top
+sort_names = [feature_names[i] for i in indices]
+
+# plot the bar chart
+fig, ax = plt.subplots(figsize=(11, 6))
+y_pos = np.arange(len(sort_names))
+
+# plot the actual bars, make it look like the other models
+ax.barh(y_pos, importances[indices], color='#81B29A', alpha=0.88)
+ax.set_yticks(y_pos)
+ax.set_yticklabels(sort_names)
+ax.set_xlabel('feature importance score')
+ax.set_title('XGBoost: How much each column contributes to the prediction')
+
+# add the importance values next to the bars
+for i, v in enumerate(importances[indices]):
+    ax.text(v + 0.002, i, f'{v:.3f}', va='center', fontsize=9, color='#3D405B')
+
+# make it look borderless like on other models 
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.grid(axis='x', alpha=0.25, linestyle='--')
+
+# make sure everything fits well
+plt.tight_layout()
+plt.savefig('xgb_feature_importance.png', dpi=150, bbox_inches='tight')
 plt.show()
